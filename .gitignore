@@ -36,6 +36,7 @@ wheels/
 # Logs
 *.log
 logs/
+*.png
 
 # Local development
 *.sqlite3
