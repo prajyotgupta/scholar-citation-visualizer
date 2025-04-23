@@ -1,76 +1,56 @@
-# Scholar Citation Visualizer 🌍
+# Scholar Citation Visualizer
 
-A Python-based tool that creates an interactive world map visualization of research citations for a specific author using Google Scholar data.
-
-## Overview
-
-This project fetches publication and citation data from Google Scholar for a specified author and generates an interactive world map visualization showing the global impact of their research. The visualization helps understand the geographical distribution of citations and research influence.
+A Python tool that visualizes the geographical distribution of citations for a Google Scholar author. This tool fetches author details, their publications, and citations, then creates a world map showing where the citing authors are located.
 
 ## Features
 
-- Fetches publication data from Google Scholar
-- Processes citation information
-- Generates an interactive world map visualization
-- Shows citation distribution across different countries
-- Interactive tooltips with detailed information
+- Fetches author details and publications from Google Scholar
+- Analyzes citations and their authors
+- Geocodes author affiliations to their geographical locations
+- Creates an interactive world map visualization
+- Handles various affiliation formats and common institutions
 
-## Prerequisites
+## Setup
 
-- Python 3.7+
-- Required Python packages:
-  - scholarly
-  - pandas
-  - plotly
-  - geopandas
-  - pycountry
-
-## Installation
-
-1. Clone the repository:
+1. Create a virtual environment:
 ```bash
-git clone https://github.com/yourusername/scholar-citation-visualizer.git
-cd scholar-citation-visualizer
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 ```
 
-2. Install the required packages:
+2. Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
 ## Usage
 
-1. Update the author ID in `scholar.py`:
-```python
-my_author_id = 'YOUR_AUTHOR_ID'  # Replace with your Google Scholar author ID
-```
-
+1. Update the `AUTHOR_ID` in `scholar.py` with your Google Scholar ID
 2. Run the script:
 ```bash
 python scholar.py
 ```
 
-3. The script will:
-   - Fetch publication data from Google Scholar
-   - Process citation information
-   - Generate an interactive HTML visualization
+The script will:
+- Fetch author details and publications
+- Process citations
+- Create a map visualization
+- Save the map as `citations_map.png`
 
-## Output
+## Visualization
 
-The script generates an interactive HTML file (`citation_map.html`) that can be opened in any web browser. The visualization includes:
-- A world map with color-coded regions based on citation density
-- Interactive tooltips showing detailed citation information
-- Zoom and pan capabilities
-- Country-specific citation statistics
+The tool creates a world map showing the geographical distribution of citing authors. Each point on the map represents an institution where citing authors are affiliated.
 
-## Contributing
+![Citation Map](citations_map.png)
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+## Dependencies
+
+- scholarly
+- geopy
+- plotly
+- kaleido
+- certifi
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- [scholarly](https://github.com/scholarly-python-package/scholarly) - For Google Scholar data access
-- [plotly](https://plotly.com/) - For interactive visualizations 
+MIT License 

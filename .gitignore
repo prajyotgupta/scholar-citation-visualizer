@@ -37,6 +37,7 @@ wheels/
 *.log
 logs/
 *.png
+!citations_map.png
 
 # Local development
 *.sqlite3
