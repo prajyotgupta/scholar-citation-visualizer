@@ -105,9 +105,13 @@ def print_author_details(author):
 def scholar_visualizer():
     """
     This function searches for an author's details and publications using the scholarly library.
+    Modified to process only a specific paper.
     """
     # Add your author ID here
     my_author_id = AUTHOR_ID
+    
+    # Specific paper citation ID from the URL
+    target_citation_id = "u-x6o8ySG0sC"  # Updated citation ID for the new paper
 
     # Search for author
     author = scholarly.search_author_id(my_author_id)
@@ -118,16 +122,37 @@ def scholar_visualizer():
     # Print formatted author details
     print_author_details(author)
 
-    # Get all citations
-    all_citations = []
+    # Find the specific publication
+    target_publication = None
     for pub in author['publications']:
-        try:
-            citations = scholarly.citedby(pub)
-            all_citations.extend(citations)
-        except KeyError:
-            print(f"KeyError encountered for publication: {pub}. Skipping.")
+        # The citation ID is typically in the 'author_pub_id' field
+        if pub.get('author_pub_id', '').endswith(target_citation_id):
+            target_publication = pub
+            break
+    
+    if not target_publication:
+        print(f"Could not find publication with citation ID: {target_citation_id}")
+        return
+    
+    print(f"\n" + "="*50)
+    print("TARGET PUBLICATION FOUND")
+    print("="*50)
+    print(f"Title: {target_publication.get('bib', {}).get('title', 'N/A')}")
+    print(f"Year: {target_publication.get('bib', {}).get('pub_year', 'N/A')}")
+    print(f"Citations: {target_publication.get('num_citations', 0)}")
+    print(f"Authors: {target_publication.get('bib', {}).get('author', 'N/A')}")
 
-    print(f"Total citations: {len(all_citations)}")
+    # Get citations for this specific publication only
+    all_citations = []
+    try:
+        citations = scholarly.citedby(target_publication)
+        all_citations.extend(citations)
+        print(f"\nSuccessfully retrieved {len(all_citations)} citations for this paper")
+    except KeyError:
+        print(f"KeyError encountered for publication: {target_publication}. Skipping.")
+        return
+
+    print(f"Total citations for this paper: {len(all_citations)}")
 
     # Process cited authors
     cited_authors = []
@@ -234,16 +259,123 @@ def scholar_visualizer():
         )
         
         fig.update_layout(
-            title='Citations Map',
+            title=f'Citations Map for: {target_publication.get("bib", {}).get("title", "Target Paper")}',
             geo_scope='world',
         )
         
         # Save the figure
-        fig.write_image("citations_map.png", scale=2)
-        print("\nMap saved as citations_map.png")
+        fig.write_image("citations_map_single_paper.png", scale=2)
+        print("\nMap saved as citations_map_single_paper.png")
         print(f"Total locations mapped: {len(latitudes)}")
+        
+        # Print summary of locations
+        print("\n" + "="*50)
+        print("SUMMARY OF LOCATIONS")
+        print("="*50)
+        for i, (affiliation, address) in enumerate(zip(location_names, addresses), 1):
+            print(f"{i}. {affiliation}")
+            print(f"   -> {address}")
+            print()
+        
     else:
         print("\nNo valid locations found to create map")
+    
+    # Print the hierarchical citation tree
+    print_citation_tree(target_publication, all_citations, cited_authors)
+
+def print_citation_tree(target_publication, all_citations, cited_authors):
+    """
+    Print a hierarchical tree structure showing the paper, citing papers, and affiliations.
+    Better organized to match authors with their specific citing papers.
+    """
+    print("\n" + "="*80)
+    print("CITATION TREE")
+    print("="*80)
+    
+    # Main paper
+    target_title = target_publication.get('bib', {}).get('title', 'Target Paper')
+    print(f"📄 {target_title}")
+    
+    # Create a mapping of author names to affiliations from our cited_authors
+    author_affiliation_map = {}
+    for author in cited_authors:
+        if 'name' in author and 'affiliation' in author:
+            author_affiliation_map[author['name']] = author['affiliation']
+    
+    # Process each citation and its authors
+    for i, citation in enumerate(all_citations, 1):
+        citation_title = citation['bib']['title']
+        print(f"│")
+        if i == len(all_citations):  # Last citation
+            print(f"└── 📝 {citation_title}")
+            connector = "    "
+        else:
+            print(f"├── 📝 {citation_title}")
+            connector = "│   "
+        
+        # Get authors from the citation
+        citation_has_authors = False
+        authors = []
+        
+        # Try to get author names from the bib data
+        if 'author' in citation.get('bib', {}):
+            bib_authors = citation['bib']['author']
+            if isinstance(bib_authors, str):
+                # Single author or comma-separated string
+                if ',' in bib_authors and ' and ' not in bib_authors:
+                    authors = [name.strip() for name in bib_authors.split(',')]
+                else:
+                    authors = [bib_authors]
+            elif isinstance(bib_authors, list):
+                authors = bib_authors
+        
+        # If we have authors, display them with affiliations
+        if authors:
+            for j, author_name in enumerate(authors):
+                is_last_author = (j == len(authors) - 1)
+                
+                # Clean up author name (remove extra spaces, etc.)
+                clean_author = author_name.strip()
+                
+                # Check if we have affiliation info for this author
+                affiliation_found = None
+                for known_name, affiliation in author_affiliation_map.items():
+                    # Try different matching strategies
+                    if (clean_author.lower() == known_name.lower() or 
+                        clean_author.lower() in known_name.lower() or
+                        known_name.lower() in clean_author.lower()):
+                        affiliation_found = affiliation
+                        break
+                
+                # Format the output
+                if is_last_author:
+                    branch = "└──"
+                else:
+                    branch = "├──"
+                
+                if affiliation_found:
+                    print(f"{connector}{branch} 🏛️  {clean_author} → {affiliation_found}")
+                else:
+                    print(f"{connector}{branch} 👤 {clean_author} (No institutional information)")
+                
+                citation_has_authors = True
+        
+        # If we still don't have authors, check if any of our known authors might be from this paper
+        if not citation_has_authors:
+            # Check if any cited authors might be associated with this citation title
+            found_match = False
+            for author in cited_authors:
+                if 'name' in author:
+                    # This is a very basic heuristic - in reality, this would need more sophisticated matching
+                    print(f"{connector}└── ❓ No author information available")
+                    found_match = True
+                    break
+            
+            if not found_match:
+                print(f"{connector}└── ❓ No author information available")
+    
+    print(f"│")
+    print("└── End of citations")
 
 if __name__ == "__main__":
     scholar_visualizer()
