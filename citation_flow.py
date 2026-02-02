@@ -11,6 +11,7 @@ import re
 import time
 from collections import defaultdict
 from datetime import datetime
+from pathlib import Path
 
 from scholarly import ProxyGenerator, scholarly
 from geopy.geocoders import Nominatim
@@ -18,12 +19,14 @@ import plotly.graph_objects as go
 
 AUTHOR_ID = "FA9h3ngAAAAJ"
 DEFAULT_MAX_PAPERS = 4
-DEFAULT_XLSX = "citations_review.xlsx"
-DEFAULT_MAP = "citations_map_from_xlsx.png"
-DEFAULT_UNMAPPED = "unmapped_cities.txt"
+DEFAULT_OUTPUT_DIR = Path("output")
+DEFAULT_XLSX = str(DEFAULT_OUTPUT_DIR / "citations_review.xlsx")
+DEFAULT_MAP = str(DEFAULT_OUTPUT_DIR / "citations_map_from_xlsx.png")
+DEFAULT_UNMAPPED = str(DEFAULT_OUTPUT_DIR / "unmapped_cities.txt")
 DEFAULT_COLUMN_F_XLSX = "citations_data.xlsx"
 DEFAULT_COLUMN_F_OUTPUT = "aish_citation_world_map.png"
-DEFAULT_CITY_CACHE = "city_mapping_cache.json"
+DEFAULT_CITY_CACHE = str(DEFAULT_OUTPUT_DIR / "city_mapping_cache.json")
+DEFAULT_COLUMN_F_SUMMARY = str(DEFAULT_OUTPUT_DIR / "citation_location_tree.txt")
 
 # Light-weight institution-to-city mappings to improve city inference.
 INSTITUTION_CITY_MAPPINGS = {
@@ -164,6 +167,7 @@ def load_city_cache(cache_path):
 
 
 def save_city_cache(cache_path, cache):
+    Path(cache_path).parent.mkdir(parents=True, exist_ok=True)
     with open(cache_path, "w", encoding="utf-8") as f:
         json.dump(cache, f, indent=2, ensure_ascii=False)
 
@@ -387,10 +391,12 @@ def generate_review_xlsx(author_id, max_papers, output_xlsx):
 
         ws.freeze_panes = "A2"
 
+    Path(output_xlsx).parent.mkdir(parents=True, exist_ok=True)
     wb.save(output_xlsx)
     print(f"\n✅ Review XLSX saved: {output_xlsx}")
 
-    summary_path = "citations_review_summary.json"
+    summary_path = str(DEFAULT_OUTPUT_DIR / "citations_review_summary.json")
+    DEFAULT_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     with open(summary_path, "w", encoding="utf-8") as f:
         json.dump(
             {
@@ -467,10 +473,12 @@ def generate_map_from_xlsx(xlsx_path, output_path, unmapped_path):
     )
     fig.update_geos(visible=True, scope="world", showcountries=True, countrycolor="Grey")
     fig.update_layout(title="Citations Map (from XLSX)")
+    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
     fig.write_image(output_path, scale=2)
     print(f"✅ Map saved: {output_path}")
 
     if unmapped:
+        Path(unmapped_path).parent.mkdir(parents=True, exist_ok=True)
         with open(unmapped_path, "w", encoding="utf-8") as f:
             f.write("\n".join(unmapped))
         print(f"⚠️  Unmapped cities ({len(unmapped)}). See: {unmapped_path}")
@@ -505,7 +513,53 @@ def collect_cities_from_column(xlsx_path, column_index):
     return city_counts
 
 
-def generate_map_from_column_f(xlsx_path, output_path, unmapped_path, cache_path):
+def build_citation_city_tree(xlsx_path, cache):
+    from openpyxl import load_workbook
+
+    wb = load_workbook(xlsx_path)
+    tree = defaultdict(lambda: defaultdict(set))
+
+    for sheet_name in wb.sheetnames:
+        ws = wb[sheet_name]
+        if ws.max_row < 2:
+            continue
+
+        for row in ws.iter_rows(min_row=2, values_only=True):
+            if not row or len(row) < 6:
+                continue
+            aish_paper = row[0] or sheet_name
+            citing_paper = row[1] or "Unknown Citing Paper"
+            city_raw = row[5]
+            if not city_raw:
+                continue
+            values = [v.strip() for v in re.split(r"[;\n]", str(city_raw)) if v.strip()]
+            for value in values:
+                label = cache.get(value, {}).get("label", value)
+                tree[aish_paper][citing_paper].add(label)
+
+    return tree
+
+
+def write_citation_city_tree(tree, output_path):
+    lines = ["# Citation Location Tree", ""]
+    for aish_paper in sorted(tree.keys()):
+        lines.append(f"## {aish_paper}")
+        for citing_paper in sorted(tree[aish_paper].keys()):
+            cities = sorted(tree[aish_paper][citing_paper])
+            cities_text = "; ".join(cities) if cities else "N/A"
+            lines.append(f"- {citing_paper} — {cities_text}")
+        lines.append("")
+
+    content = "\n".join(lines).strip() + "\n"
+    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write(content)
+
+    print("\n📌 Citation location tree:")
+    print(content)
+
+
+def generate_map_from_column_f(xlsx_path, output_path, unmapped_path, cache_path, summary_path):
     city_counts = collect_cities_from_column(xlsx_path, column_index=6)
     if not city_counts:
         print("❌ No cities found in Column F. Check your data.")
@@ -513,6 +567,7 @@ def generate_map_from_column_f(xlsx_path, output_path, unmapped_path, cache_path
 
     geolocator = get_geocoder()
     cache = update_city_cache(city_counts.keys(), geolocator, cache_path)
+    tree = build_citation_city_tree(xlsx_path, cache)
 
     latitudes = []
     longitudes = []
@@ -570,15 +625,19 @@ def generate_map_from_column_f(xlsx_path, output_path, unmapped_path, cache_path
     )
     fig.update_geos(visible=True, scope="world", showcountries=True, countrycolor="Grey")
     fig.update_layout(title="Aishwarya Lekshmi Chithra's Citation Map")
+    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
     fig.write_image(output_path, scale=2)
     print(f"✅ Map saved: {output_path}")
 
     if unmapped:
+        Path(unmapped_path).parent.mkdir(parents=True, exist_ok=True)
         with open(unmapped_path, "w", encoding="utf-8") as f:
             f.write("\n".join(sorted(set(unmapped))))
         print(f"⚠️  Unmapped cities ({len(set(unmapped))}). See: {unmapped_path}")
     else:
         print("✅ All cities mapped successfully.")
+
+    write_citation_city_tree(tree, summary_path)
 
 
 def main():
@@ -600,6 +659,7 @@ def main():
     column_parser.add_argument("--output", default=DEFAULT_COLUMN_F_OUTPUT, help="Output map image path")
     column_parser.add_argument("--unmapped", default=DEFAULT_UNMAPPED, help="Unmapped cities output")
     column_parser.add_argument("--cache", default=DEFAULT_CITY_CACHE, help="City mapping cache JSON")
+    column_parser.add_argument("--summary", default=DEFAULT_COLUMN_F_SUMMARY, help="Citation location tree output")
 
     args = parser.parse_args()
 
@@ -608,7 +668,7 @@ def main():
     elif args.command == "map":
         generate_map_from_xlsx(args.xlsx, args.output, args.unmapped)
     elif args.command == "map-column-f":
-        generate_map_from_column_f(args.xlsx, args.output, args.unmapped, args.cache)
+        generate_map_from_column_f(args.xlsx, args.output, args.unmapped, args.cache, args.summary)
 
 
 if __name__ == "__main__":

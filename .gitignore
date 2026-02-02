@@ -1,6 +1,7 @@
 # Environment
 .env
 .venv
+.venv312
 venv/
 ENV/
 
@@ -37,7 +38,10 @@ wheels/
 *.log
 logs/
 *.png
-!citations_map.png
+!aish_citation_world_map.png
+
+# Generated outputs
+output/
 
 # Local development
 *.sqlite3

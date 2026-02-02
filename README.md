@@ -47,7 +47,7 @@ the edited XLSX.
 python citation_flow.py fetch
 ```
 
-2. Review and edit `citations_review.xlsx` (fix city names if needed)
+2. Review and edit `output/citations_review.xlsx` (fix city names if needed)
 
 3. Generate the map from the edited XLSX:
 ```bash
@@ -55,9 +55,10 @@ python citation_flow.py map
 ```
 
 Outputs:
-- `citations_review.xlsx` (per-paper tabs)
-- `citations_map_from_xlsx.png`
-- `unmapped_cities.txt` (only if any city can't be geocoded)
+- `output/citations_review.xlsx` (per-paper tabs)
+- `output/citations_map_from_xlsx.png`
+- `output/unmapped_cities.txt` (only if any city can't be geocoded)
+- `output/citation_location_tree.txt` (list of cities per citing paper)
 
 ## Generate Map From Column F
 
@@ -72,8 +73,13 @@ python citation_flow.py map-column-f \
 
 This will:
 - Read Column F from each sheet and dedupe cities
-- Use/refresh `city_mapping_cache.json` for mapping
-- Write `unmapped_cities.txt` if anything cannot be geocoded
+- Use/refresh `output/city_mapping_cache.json` for mapping
+- Write `output/unmapped_cities.txt` if anything cannot be geocoded
+- Write `output/citation_location_tree.txt` with per-paper city listings
+
+## Generated Map
+
+![Aishwarya Lekshmi Chithra's Citation Map](aish_citation_world_map.png)
 
 ## Visualization
 
