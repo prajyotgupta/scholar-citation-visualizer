@@ -37,6 +37,44 @@ The script will:
 - Create a map visualization
 - Save the map as `citations_map.png`
 
+## Two-Step Review Flow (Recommended)
+
+This flow generates a per-paper XLSX for manual review, then builds the map from
+the edited XLSX.
+
+1. Generate the review XLSX (top 4 papers by citations):
+```bash
+python citation_flow.py fetch
+```
+
+2. Review and edit `citations_review.xlsx` (fix city names if needed)
+
+3. Generate the map from the edited XLSX:
+```bash
+python citation_flow.py map
+```
+
+Outputs:
+- `citations_review.xlsx` (per-paper tabs)
+- `citations_map_from_xlsx.png`
+- `unmapped_cities.txt` (only if any city can't be geocoded)
+
+## Generate Map From Column F
+
+If you already have `citations_data.xlsx` with city/country values in Column F
+across the four tabs, you can generate the map directly:
+
+```bash
+python citation_flow.py map-column-f \
+  --xlsx citations_data.xlsx \
+  --output aish_citation_world_map.png
+```
+
+This will:
+- Read Column F from each sheet and dedupe cities
+- Use/refresh `city_mapping_cache.json` for mapping
+- Write `unmapped_cities.txt` if anything cannot be geocoded
+
 ## Visualization
 
 The tool creates a world map showing the geographical distribution of citing authors. Each point on the map represents an institution where citing authors are affiliated.
